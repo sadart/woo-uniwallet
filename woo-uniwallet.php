@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Uniwallet Payments for WooCommerce.
  * Plugin URI: https://wordpress.org/plugins/woo-uniwallet-payments-gateway/
- * Description: This plugin enables you to accept online payments for Ghana issued cards and mobile money payments using Uniwallet payments API..
+ * Description: This plugin enables you to accept online payments for mobile money payments using Uniwallet payments API..
  * Version: 1.0.0
  * Author: Sadart Abukari
  * Author URI: https://www.linkedin.com/in/sadart-abukari-43a78a26/
@@ -87,7 +87,7 @@ function uniwallet_init()
 					'uniwallet_title' => array(
 						'title' =>  'Title',
 						'type' => 'text',
-						'description' =>  'This displays the title which the user sees during checkout options.',
+						'description' =>  'Pay With Uniwallet.',
 						'default' =>  'Pay With Uniwallet',
 						'desc_tip'      => true,
 						),
@@ -95,8 +95,8 @@ function uniwallet_init()
 					'uniwallet_description' => array(
 						'title' =>  'Description',
 						'type' => 'textarea',
-						'description' =>  'This is the description which the user sees during checkout.',
-						'default' =>  'Safe and secure payments with Ghana issued cards and mobile money from all networks.',
+						'description' =>  'Mobile Money Payment from all networks.',
+						'default' =>  'Safe and secure payments with Ghana mobile money from all networks.',
 						'desc_tip'      => true,
 						),
 
@@ -307,8 +307,13 @@ function uniwallet_init()
 					case 200:
 
 							if($response_body_args['responseCode'] == '03'){
+								$order->update_meta_data( '_uniwallet_transaction_id' , $response_body_args['uniwalletTransactionId']) ;
+								$order->update_meta_data( '_response' , $response_body) ;
+								$order->update_meta_data( '_response_message' , $response_body_args['responseMessage']) ;
+								$order->update_meta_data( '_response_code' , $response_body_args['responseCode']) ;
 								wc_add_notice("Enter your PIN on the prompt on your phone to complete payment", "success");
 								$order->update_status('on-hold: awaiting payment', 'Awaiting payment');
+
 								// return FALSE;
 								// Remove cart
 								$woocommerce->cart->empty_cart();
@@ -442,7 +447,39 @@ function display_uniwallet_option_on_order_totals( $total_rows, $order, $tax_dis
             }
         }
         $total_rows = $sorted_total_rows;
-    }
+	}
+
+    if ( $order->get_payment_method() === 'uniwallet-payments' && $uniwallet_transaction_id = $order->get_meta('_uniwallet_transaction_id') ) {
+        $sorted_total_rows = [];
+
+        foreach ( $total_rows as $key_row => $total_row ) {
+            $sorted_total_rows[$key_row] = $total_row;
+            if( $key_row === 'payment_method' ) {
+                $sorted_total_rows['_uniwallet_transaction_id'] = [
+                    'label' => __( "Uniwallet Transaction Id", "woocommerce"),
+                    'value' => esc_html( $uniwallet_transaction_id ),
+                ];
+            }
+        }
+        $total_rows = $sorted_total_rows;
+	}
+
+    if ( $order->get_payment_method() === 'uniwallet-payments' && $response = $order->get_meta('_response') ) {
+        $sorted_total_rows = [];
+
+        foreach ( $total_rows as $key_row => $total_row ) {
+            $sorted_total_rows[$key_row] = $total_row;
+            if( $key_row === 'payment_method' ) {
+                $sorted_total_rows['_response'] = [
+                    'label' => __( "Response", "woocommerce"),
+                    'value' => esc_html( $response),
+                ];
+            }
+        }
+        $total_rows = $sorted_total_rows;
+	}
+		
+
     return $total_rows;
 }
 
@@ -457,6 +494,16 @@ function display_uniwallet_option_near_admin_order_billing_address( $order ){
     if( $uniwallet_network = $order->get_meta('_uniwallet_network') ) {
         echo '<div class="uniwallet-option">
         <p><strong>'.__('Network').':</strong> ' . $uniwallet_network . '</p>
+        </div>';
+    }
+    if( $uniwallet_transaction_id = $order->get_meta('_uniwallet_transaction_id') ) {
+        echo '<div class="uniwallet-option">
+        <p><strong>'.__('Uniwallet Transaction Id').':</strong> ' . $uniwallet_transaction_id . '</p>
+        </div>';
+    }
+    if( $response = $order->get_meta('_response') ) {
+        echo '<div class="uniwallet-option">
+        <p><strong>'.__('Response').':</strong> ' . $response . '</p>
         </div>';
     }
 }
